@@ -68,7 +68,7 @@
 public enum Snappy {
 
     /// Current version of the library
-    public static let version = "1.0.0"
+    public static let version = "1.0.1"
 
     /// C++ Snappy version this implementation is compatible with
     /// - Note: This implementation follows the Snappy 1.x format specification
