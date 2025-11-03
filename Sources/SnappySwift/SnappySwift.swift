@@ -70,6 +70,11 @@ public enum Snappy {
     /// Current version of the library
     public static let version = "1.0.0"
 
+    /// C++ Snappy version this implementation is compatible with
+    /// - Note: This implementation follows the Snappy 1.x format specification
+    ///         and has been tested against Google C++ Snappy v1.2.2
+    public static let compatibleSnappyVersion = "1.2.2"
+
     // MARK: - Public API
 
     /// Calculate the maximum possible compressed size for a given input size.

@@ -243,9 +243,14 @@ swift test --filter BenchmarkTests.testCompressionRatios
 
 ### C++ Compatibility Testing
 
-The project includes C++ validation tools:
+The project includes C++ validation tools for development and testing.
+
+**Note**: The C++ reference implementation is included as an **optional git submodule**. End users and app developers don't need it - it's only for library development and testing.
 
 ```bash
+# Initialize the C++ Snappy submodule (only needed for development)
+git submodule update --init
+
 # Compile C++ tools (requires g++)
 g++ -std=c++11 generate_test_data.cpp \
     snappy-cpp/snappy.cc \
@@ -266,15 +271,33 @@ g++ -std=c++11 validate_snappy.cpp \
 ./validate_snappy <file.snappy> <expected-size>
 ```
 
+**When you need the submodule:**
+- ✅ Regenerating test data from C++ reference
+- ✅ Validating Swift-compressed output against C++
+- ✅ Updating to newer C++ Snappy versions
+- ✅ Contributing compatibility tests
+
+**When you DON'T need it:**
+- ❌ Using SnappySwift in your app (SPM handles everything)
+- ❌ Running the existing test suite (test data is pre-generated)
+
 ## Compatibility
 
 This implementation is **100% compatible** with Google's C++ Snappy implementation:
 
+- **Format**: Snappy 1.x format specification
+- **Tested against**: Google C++ Snappy v1.2.2
+- **Interoperability**: 100% compatible (reads and writes same format)
 - ✅ Decompresses all C++ Snappy output correctly
 - ✅ Swift-compressed data decompresses correctly with C++
 - ✅ Follows the same format specification
 - ✅ Tested against reference test data (13 test cases)
 - ✅ Large payload support (up to 10MB tested, supports up to 4GB)
+
+**Version Compatibility:**
+- SnappySwift 1.0.0 implements the Snappy 1.x format
+- Compatible with all Snappy 1.x implementations (C++, Java, Python, etc.)
+- Binary format is stable and backward-compatible
 
 ## Best Practices
 
