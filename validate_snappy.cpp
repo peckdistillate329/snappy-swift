@@ -1,9 +1,9 @@
 // Validate Snappy compressed files using C++ decompressor
 // This validates that Swift-compressed data can be decompressed by C++
-// Compile: g++ -std=c++11 validate_snappy.cpp snappy-cpp/snappy.cc snappy-cpp/snappy-sinksource.cc snappy-cpp/snappy-stubs-internal.cc -o validate_snappy
+// Compile: g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build validate_snappy.cpp ../snappy-cpp/snappy.cc ../snappy-cpp/snappy-sinksource.cc ../snappy-cpp/snappy-stubs-internal.cc -o validate_snappy
 // Usage: ./validate_snappy <compressed_file> <expected_uncompressed_size>
 
-#include "snappy-cpp/snappy.h"
+#include "../snappy-cpp/snappy.h"
 #include <fstream>
 #include <iostream>
 #include <string>

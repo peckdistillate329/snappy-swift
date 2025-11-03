@@ -1,8 +1,8 @@
 // Generate test data for Snappy Swift implementation
-// Compile: g++ -std=c++11 generate_test_data.cpp snappy-cpp/snappy.cc snappy-cpp/snappy-sinksource.cc snappy-cpp/snappy-stubs-internal.cc -o generate_test_data
+// Compile: g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build generate_test_data.cpp ../snappy-cpp/snappy.cc ../snappy-cpp/snappy-sinksource.cc ../snappy-cpp/snappy-stubs-internal.cc -o generate_test_data
 // Run: ./generate_test_data
 
-#include "snappy-cpp/snappy.h"
+#include "../snappy-cpp/snappy.h"
 #include <fstream>
 #include <iostream>
 #include <string>

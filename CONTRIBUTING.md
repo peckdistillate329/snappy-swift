@@ -50,29 +50,49 @@ Projects/
 └── snappy-cpp/            # C++ reference (separate)
 ```
 
-#### 2. Compile C++ Tools
+#### 2. Build C++ Library (Generate Headers)
+
+The C++ library needs to be configured with CMake to generate required header files:
+
+```bash
+# Configure and build C++ library (one-time setup)
+cd ../snappy-cpp
+cmake -S . -B build
+# Note: Build may fail due to missing test dependencies, but that's okay!
+# The header generation happens first and is all we need.
+
+cd ../snappy-swift
+```
+
+This generates `snappy-stubs-public.h` in `../snappy-cpp/build/`, which is required for compilation.
+
+#### 3. Compile C++ Tools
 
 The repository includes two C++ tools:
 
 ```bash
 # Compile test data generator (requires g++ or clang++)
-g++ -std=c++11 generate_test_data.cpp \
+g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build \
+    generate_test_data.cpp \
     ../snappy-cpp/snappy.cc \
     ../snappy-cpp/snappy-sinksource.cc \
     ../snappy-cpp/snappy-stubs-internal.cc \
     -o generate_test_data
 
 # Compile validation tool
-g++ -std=c++11 validate_snappy.cpp \
+g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build \
+    validate_snappy.cpp \
     ../snappy-cpp/snappy.cc \
     ../snappy-cpp/snappy-sinksource.cc \
     ../snappy-cpp/snappy-stubs-internal.cc \
     -o validate_snappy
 ```
 
-**Note:** The compiled binaries (`generate_test_data`, `validate_snappy`) are gitignored and should not be committed.
+**Note:**
+- The `-I` flags add include paths for C++ headers
+- The compiled binaries (`generate_test_data`, `validate_snappy`) are gitignored and should not be committed
 
-#### 3. Using C++ Tools
+#### 4. Using C++ Tools
 
 **Generate Test Data:**
 ```bash
@@ -96,10 +116,15 @@ swift test --filter testLargePayloadCompatibility
 cd ../snappy-cpp
 git pull origin main
 
+# Rebuild to regenerate headers (if CMakeLists.txt changed)
+cmake -S . -B build
+
 # Return to snappy-swift and recompile tools
 cd ../snappy-swift
-g++ -std=c++11 generate_test_data.cpp ../snappy-cpp/snappy*.cc -o generate_test_data
-g++ -std=c++11 validate_snappy.cpp ../snappy-cpp/snappy*.cc -o validate_snappy
+g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build \
+    generate_test_data.cpp ../snappy-cpp/snappy*.cc -o generate_test_data
+g++ -std=c++11 -I../snappy-cpp -I../snappy-cpp/build \
+    validate_snappy.cpp ../snappy-cpp/snappy*.cc -o validate_snappy
 
 # Regenerate test data if needed
 ./generate_test_data
