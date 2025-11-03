@@ -17,3 +17,6 @@ xcuserdata/
 # Test coverage
 *.profdata
 *.profraw
+
+# Test data generator
+generate_test_data
