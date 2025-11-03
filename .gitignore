@@ -13,11 +13,17 @@ xcuserdata/
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Test coverage
 *.profdata
 *.profraw
 
-# Test data generator and validator
+# C++ build artifacts
+snappy-cpp/build/
+*.o
+*.dSYM
+
+# Test data generator and validator (binaries only - keep .cpp sources)
 generate_test_data
 validate_snappy

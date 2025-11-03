@@ -41,15 +41,31 @@ extension Snappy {
             return op
         }
 
-        // Compress the data
-        let bytesWritten = try compressFragment(
-            input,
-            to: output,
-            outputOffset: op,
-            options: options
-        )
+        // Compress in fragments of at most 64 KiB to avoid UInt16 overflow in hash table
+        // This matches the C++ reference implementation's block size
+        let maxFragmentSize = 65536  // 64 KiB
+        var inputOffset = 0
 
-        return op + bytesWritten
+        while inputOffset < input.count {
+            let fragmentSize = min(maxFragmentSize, input.count - inputOffset)
+            let fragmentEnd = inputOffset + fragmentSize
+
+            // Create fragment view
+            let fragment = UnsafeBufferPointer(rebasing: input[inputOffset..<fragmentEnd])
+
+            // Compress this fragment
+            let bytesWritten = try compressFragment(
+                fragment,
+                to: output,
+                outputOffset: op,
+                options: options
+            )
+
+            op += bytesWritten
+            inputOffset = fragmentEnd
+        }
+
+        return op
     }
 
     /// Compress a single fragment of data.
@@ -87,72 +103,94 @@ extension Snappy {
         var ip = 0              // Input position
         var nextEmit = 0        // Next byte to emit as literal
         var op = outputOffset   // Output position
+        var nextIp = 1          // Next position to check
+        var skip = 32           // Skip increment for incompressible data
 
         // Leave enough room at end for final literal
         let inputLimit = inputSize - 15
 
         // Main compression loop
         while ip < inputLimit {
-            // Load 4 bytes for hashing
-            let bytes = load32(from: input, at: ip)
-            let hash = hashBytes(bytes, mask: hashMask)
+            // Track where we started looking for this match
+            var candidateOffset = 0
+            var bytes: UInt32 = 0
 
-            // Look up candidate match
-            let candidateOffset = Int(hashTable[hash])
+            // Skip heuristic: try increasingly large steps if no matches found
+            repeat {
+                ip = nextIp
+                let bytesSkipped = ip - nextEmit
 
-            // Store current position in hash table
-            hashTable[hash] = UInt16(truncatingIfNeeded: ip)
+                // Calculate skip increment (divide by 32)
+                skip = bytesSkipped >> 5
+                nextIp = ip + 1 + skip
 
-            // Check if we have a valid candidate
-            if candidateOffset != 0 && ip - candidateOffset <= 65535 {
-                // Verify the match
-                if load32(from: input, at: candidateOffset) == bytes {
-                    // Found a match!
-
-                    // Emit literal for unmatched bytes [nextEmit, ip)
-                    if nextEmit < ip {
-                        op += emitLiteral(
-                            UnsafeBufferPointer(rebasing: input[nextEmit..<ip]),
-                            to: output,
-                            at: op
-                        )
-                    }
-
-                    // Find full match length
-                    let matchLength = findMatchLength(
-                        in: input,
-                        s1: candidateOffset + 4,
-                        s2: ip + 4,
-                        limit: inputSize
-                    ) + 4
-
-                    // Emit copy operation
-                    op += emitCopy(
-                        offset: ip - candidateOffset,
-                        length: matchLength,
-                        to: output,
-                        at: op
-                    )
-
-                    // Skip matched bytes and update hash table
-                    ip += matchLength
-                    nextEmit = ip
-
-                    // Insert intermediate positions into hash table
-                    // This helps find matches within the matched region
-                    if ip < inputLimit {
-                        let nextBytes = load32(from: input, at: ip - 1)
-                        let nextHash = hashBytes(nextBytes, mask: hashMask)
-                        hashTable[nextHash] = UInt16(truncatingIfNeeded: ip - 1)
-                    }
-
-                    continue
+                // Exit if we've reached the limit
+                if nextIp > inputLimit {
+                    break
                 }
+
+                // Load 4 bytes for hashing
+                bytes = load32(from: input, at: ip)
+                let hash = hashBytes(bytes, mask: hashMask)
+
+                // Look up candidate match
+                candidateOffset = Int(hashTable[hash])
+
+                // Store current position in hash table
+                hashTable[hash] = UInt16(truncatingIfNeeded: ip)
+
+                // Check if we have a valid candidate with matching bytes
+            } while candidateOffset == 0 ||
+                    ip - candidateOffset > 65535 ||
+                    load32(from: input, at: candidateOffset) != bytes
+
+            // Exit if skip heuristic went past limit
+            if nextIp > inputLimit {
+                break
             }
 
-            // No match found - advance input position
-            // TODO: Add skip heuristic for incompressible data
-            ip += 1
+            // Found a match!
+
+            // Emit literal for unmatched bytes [nextEmit, ip)
+            if nextEmit < ip {
+                op += emitLiteral(
+                    UnsafeBufferPointer(rebasing: input[nextEmit..<ip]),
+                    to: output,
+                    at: op
+                )
+            }
+
+            // Find full match length
+            let matchLength = findMatchLength(
+                in: input,
+                s1: candidateOffset + 4,
+                s2: ip + 4,
+                limit: inputSize
+            ) + 4
+
+            // Emit copy operation
+            op += emitCopy(
+                offset: ip - candidateOffset,
+                length: matchLength,
+                to: output,
+                at: op
+            )
+
+            // Skip matched bytes and update hash table
+            ip += matchLength
+            nextEmit = ip
+
+            // Reset skip counter after finding a match
+            skip = 32
+            nextIp = ip + 1
+
+            // Insert intermediate positions into hash table
+            // This helps find matches within the matched region
+            if ip < inputLimit {
+                let nextBytes = load32(from: input, at: ip - 1)
+                let nextHash = hashBytes(nextBytes, mask: hashMask)
+                hashTable[nextHash] = UInt16(truncatingIfNeeded: ip - 1)
+            }
         }
 
         // Emit final literal for remaining bytes
@@ -224,7 +262,33 @@ extension Snappy {
         var pos1 = s1
         var pos2 = s2
 
-        // Compare byte by byte
+        // Compare 8 bytes at a time when possible
+        while pos2 + 8 <= limit && pos1 + 8 <= limit {
+            let b1 = load64(from: buffer, at: pos1)
+            let b2 = load64(from: buffer, at: pos2)
+
+            if b1 != b2 {
+                break
+            }
+
+            matched += 8
+            pos1 += 8
+            pos2 += 8
+        }
+
+        // Compare 4 bytes at a time
+        if pos2 + 4 <= limit && pos1 + 4 <= limit {
+            let b1 = load32(from: buffer, at: pos1)
+            let b2 = load32(from: buffer, at: pos2)
+
+            if b1 == b2 {
+                matched += 4
+                pos1 += 4
+                pos2 += 4
+            }
+        }
+
+        // Compare remaining bytes
         while pos2 < limit && pos1 < limit && buffer[pos1] == buffer[pos2] {
             matched += 1
             pos1 += 1
@@ -232,6 +296,25 @@ extension Snappy {
         }
 
         return matched
+    }
+
+    /// Load 8 bytes as little-endian UInt64
+    @inline(__always)
+    private static func load64(from buffer: UnsafeBufferPointer<UInt8>, at offset: Int) -> UInt64 {
+        precondition(offset + 8 <= buffer.count, "Buffer overflow")
+
+        // Use unaligned load to avoid alignment requirements
+        let b0 = UInt64(buffer[offset])
+        let b1 = UInt64(buffer[offset + 1])
+        let b2 = UInt64(buffer[offset + 2])
+        let b3 = UInt64(buffer[offset + 3])
+        let b4 = UInt64(buffer[offset + 4])
+        let b5 = UInt64(buffer[offset + 5])
+        let b6 = UInt64(buffer[offset + 6])
+        let b7 = UInt64(buffer[offset + 7])
+
+        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24) |
+               (b4 << 32) | (b5 << 40) | (b6 << 48) | (b7 << 56)
     }
 
     /// Emit a literal operation
@@ -268,7 +351,7 @@ extension Snappy {
         }
 
         // Copy literal data (safe for already-initialized memory)
-        output.baseAddress!.advanced(by: op).assign(
+        output.baseAddress!.advanced(by: op).update(
             from: literal.baseAddress!,
             count: length
         )
